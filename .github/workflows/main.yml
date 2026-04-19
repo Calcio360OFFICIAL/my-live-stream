@@ -1,51 +1,48 @@
-name: Live Stream Calcio 360 Completa
+name: Calcio360_Live_Stream
 
 on:
-  workflow_dispatch: # Avvio manuale da tab Actions
+  workflow_dispatch: # Questo ti permette di far partire la live a mano cliccando "Run Workflow"
 
 jobs:
   stream:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout del codice
+      - name: Checkout del repository
         uses: actions/checkout@v4
 
-      - name: Installazione dipendenze (FFmpeg e Browser)
+      - name: Installazione Ambiente (FFmpeg, Browser e Font)
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb chromium-browser fonts-liberation
+          sudo apt-get install -y ffmpeg xvfb chromium-browser fonts-dejavu fonts-liberation
 
-      - name: Avvio Live Stream
+      - name: Avvio Server Grafico e Streaming
         run: |
-          # 1. Creiamo lo schermo virtuale 1080p
+          # 1. Creiamo uno schermo virtuale
           Xvfb :99 -screen 0 1920x1080x24 &
           export DISPLAY=:99
           
-          # 2. Apriamo il widget del campo (senza barre di disturbo)
-          # NOTA: Cambia l'ID finale (4339672) nell'URL qui sotto per cambiare partita
-          chromium-browser --no-sandbox \
-            --disable-setuid-sandbox \
-            --start-fullscreen \
-            --window-size=1920,1080 \
-            --disable-features=Translate \
-            --lang=it-IT \
-            --no-first-run \
-            --disable-infobars \
+          # 2. Lanciamo Chromium ottimizzato per lo streaming
+          # Sostituisci l'ID 4339672 con quello della partita che ti serve
+          chromium-browser --no-sandbox --disable-setuid-sandbox \
+            --start-fullscreen --window-size=1920,1080 \
+            --disable-features=Translate --lang=it-IT \
+            --no-first-run --disable-infobars --disable-gpu \
             "https://widgets.thesports01.com/en/3d/football?profile=74rekh26eseunr0&id=4339672" &
           
-          sleep 20 # Tempo per caricare il widget ed eliminare i popup iniziali
+          # Aspettiamo che il widget carichi bene i 3D
+          sleep 35 
           
-          # 3. Lancio FFmpeg con tutti i filtri (Logo + Campo Croppato + Testo Scorrimento)
-          # Modifica 'TESTO FORMAZIONI' qui sotto con i nomi dei giocatori
+          # 3. FFmpeg: Unisce Video (Browser), Audio (Stadio), Logo e Testo
+          # NOTA: Ho messo 'ultrafast' per garantire che il bitrate resti alto
           ffmpeg -f x11grab -video_size 1920x1080 -i :99.0 \
           -i "football-stadium-ambience-soccer-crowd-sound-effect-043966459_nw_prev.m4a" -stream_loop -1 \
           -i "Progetto senza titolo (1).png" \
           -filter_complex \
-          "[0:v]crop=1250:850:335:120,scale=1920:1080[campo]; \
-           [campo][2:v]overlay=30:30[video_logo]; \
-           [video_logo]drawtext=text='FORMAZIONI: Bologna (4-3-3) vs Atalanta (3-4-2-1) - In diretta da Calcio360':\
-           fontcolor=white:fontsize=35:box=1:boxcolor=black@0.6:boxborderw=10:\
-           x=w-mod(t*100\,w+tw):y=h-80" \
-          -c:v libx264 -preset veryfast -b:v 3500k -maxrate 3500k -bufsize 7000k \
+          "[0:v]crop=1200:810:360:135,scale=1280:720[campo]; \
+           [campo][2:v]overlay=30:30[video_con_logo]; \
+           [video_con_logo]drawtext=text='FORMAZIONI: Inserisci qui i nomi dei giocatori - Segui Calcio360':\
+           fontcolor=white:fontsize=32:box=1:boxcolor=black@0.5:boxborderw=10:\
+           x=w-mod(t*90\,w+tw):y=h-65" \
+          -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3000k -bufsize 6000k \
           -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k \
           -f flv "rtmp://a.rtmp.youtube.com/live2/${{ secrets.STREAM_KEY }}"
