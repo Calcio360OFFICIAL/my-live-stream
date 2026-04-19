@@ -1,36 +1,28 @@
-name: Live Stream Dinamica
-
-on:
-  workflow_dispatch:
-
-jobs:
-  stream:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Dependencies
+- name: Start Stream
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb chromium-browser
-
-      - name: Start Stream
-        run: |
-          # Avviamo un monitor virtuale (Xvfb)
+          # Avviamo lo schermo virtuale
           Xvfb :99 -screen 0 1920x1080x24 &
           export DISPLAY=:99
           
-          # Apriamo il browser sul widget del campo (a tutto schermo)
-          chromium-browser --no-sandbox --disable-setuid-sandbox --start-fullscreen --window-size=1920,1080 "https://widgets.thesports01.com/en/3d/football?profile=74rekh26eseunr0&id=4339672" &
+          # Lanciamo Chromium con i flag per nascondere traduzione e info bar
+          chromium-browser --no-sandbox \
+            --disable-setuid-sandbox \
+            --start-fullscreen \
+            --window-size=1920,1080 \
+            --disable-features=Translate \
+            --lang=it-IT \
+            --no-first-run \
+            --disable-infobars \
+            "https://widgets.thesports01.com/en/3d/football?profile=74rekh26eseunr0&id=4339672" &
           
-          sleep 10 # Aspettiamo che il sito carichi
+          sleep 15 # Aspettiamo un po' di più per il caricamento completo
           
-          # FFmpeg cattura lo schermo virtuale e aggiunge audio/logo
+          # FFmpeg con CROP per eliminare il bianco e centrare il widget
+          # Il filtro "crop=larghezza:altezza:x:y" serve a tagliare i bordi inutili
           ffmpeg -f x11grab -video_size 1920x1080 -i :99.0 \
           -i "football-stadium-ambience-soccer-crowd-sound-effect-043966459_nw_prev.m4a" -stream_loop -1 \
           -i "Progetto senza titolo (1).png" \
-          -filter_complex "[0:v][2:v] overlay=10:720" \
+          -filter_complex "[0:v]crop=1200:800:360:140,scale=1920:1080[campo]; [campo][2:v]overlay=10:720" \
           -c:v libx264 -preset veryfast -b:v 3000k -maxrate 3000k -bufsize 6000k \
           -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k \
           -f flv "rtmp://a.rtmp.youtube.com/live2/${{ secrets.STREAM_KEY }}"
