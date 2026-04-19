@@ -1,4 +1,4 @@
-name: Calcio360_1080p_Pro
+name: Calcio360_Fix_Totale
 
 on:
   workflow_dispatch:
@@ -17,12 +17,11 @@ jobs:
 
       - name: Run
         run: |
-          # 1. Creiamo lo schermo ESATTAMENTE 1920x1080
+          # 1. Schermo virtuale 1080p
           Xvfb :99 -screen 0 1920x1080x24 &
           export DISPLAY=:99
           
-          # 2. Lancio Chromium con zoom forzato per eliminare il QR Code
-          # La flag --force-device-scale-factor=1 impedisce layout mobile/QR
+          # 2. Chromium: forziamo il layout desktop per evitare il QR del sito
           chromium-browser --no-sandbox --disable-setuid-sandbox \
             --window-size=1920,1080 --start-fullscreen \
             --force-device-scale-factor=1 \
@@ -32,15 +31,15 @@ jobs:
           
           sleep 35
           
-          # 3. FFmpeg: Cattura diretta senza ridimensionamento (CPU Saver)
-          # Il crop è calibrato per centrare il campo su 1920x1080
+          # 3. FFmpeg: Massima velocità, immagine rimpicciolita
+          # Ho aggiunto 'scale=200:-1' all'immagine per evitare che copra tutto
           ffmpeg -f x11grab -framerate 30 -video_size 1920x1080 -i :99.0 \
           -i "football-stadium-ambience-soccer-crowd-sound-effect-043966459_nw_prev.m4a" -stream_loop -1 \
           -i "Progetto senza titolo (1).png" \
           -filter_complex \
-          "[0:v]crop=1550:900:185:90[campo]; \
-           [campo][2:v]overlay=50:50[v]; \
-           [v]drawtext=text='LIVE CALCIO 360':fontcolor=white:fontsize=40:x=w-tw-50:y=h-th-50" \
-          -c:v libx264 -preset ultrafast -tune zerolatency -b:v 4500k -maxrate 4500k -bufsize 9000k \
+          "[0:v]crop=1500:850:210:100[campo]; \
+           [2:v]scale=250:-1[logo_piccolo]; \
+           [campo][logo_piccolo]overlay=W-w-50:50" \
+          -c:v libx264 -preset ultrafast -tune zerolatency -b:v 4000k -maxrate 4000k -bufsize 8000k \
           -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k \
           -f flv "rtmp://a.rtmp.youtube.com/live2/${{ secrets.STREAM_KEY }}"
