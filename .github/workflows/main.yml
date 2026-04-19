@@ -1,4 +1,4 @@
-name: Calcio360_Extreme_Performance
+name: Calcio360_1080p_Pro
 
 on:
   workflow_dispatch:
@@ -7,40 +7,40 @@ jobs:
   stream:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Installazione Ambiente
+      - name: Install
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb chromium-browser fonts-liberation
+          sudo apt-get install -y ffmpeg xvfb chromium-browser
 
-      - name: Avvio Streaming High-FPS
+      - name: Run
         run: |
-          # 1. Schermo virtuale ridotto per massimizzare le performance (FPS)
-          Xvfb :99 -screen 0 1280x720x24 &
+          # 1. Creiamo lo schermo ESATTAMENTE 1920x1080
+          Xvfb :99 -screen 0 1920x1080x24 &
           export DISPLAY=:99
           
-          # 2. Lancio Chromium con viewport forzato per eliminare il QR Code
-          # La risoluzione 1280x720 impedisce al widget di passare in modalità mobile
+          # 2. Lancio Chromium con zoom forzato per eliminare il QR Code
+          # La flag --force-device-scale-factor=1 impedisce layout mobile/QR
           chromium-browser --no-sandbox --disable-setuid-sandbox \
-            --window-size=1280,720 --start-fullscreen \
+            --window-size=1920,1080 --start-fullscreen \
+            --force-device-scale-factor=1 \
             --disable-features=Translate --lang=it-IT \
             --no-first-run --disable-infobars --disable-gpu \
             "https://widgets.thesports01.com/en/3d/football?profile=74rekh26eseunr0&id=4339672" &
           
-          sleep 30 
+          sleep 35
           
-          # 3. FFmpeg ottimizzato per velocità (Zero Lag)
-          # Il crop è regolato per la nuova risoluzione 1280x720
-          ffmpeg -f x11grab -framerate 30 -video_size 1280x720 -i :99.0 \
+          # 3. FFmpeg: Cattura diretta senza ridimensionamento (CPU Saver)
+          # Il crop è calibrato per centrare il campo su 1920x1080
+          ffmpeg -f x11grab -framerate 30 -video_size 1920x1080 -i :99.0 \
           -i "football-stadium-ambience-soccer-crowd-sound-effect-043966459_nw_prev.m4a" -stream_loop -1 \
           -i "Progetto senza titolo (1).png" \
           -filter_complex \
-          "[0:v]crop=1100:600:90:50,scale=1280:720[campo]; \
-           [campo][2:v]overlay=20:20[v_logo]; \
-           [v_logo]drawtext=text='FORMAZIONI: Bologna vs Atalanta - Calcio360':\
-           fontcolor=white:fontsize=28:box=1:boxcolor=black@0.4:x=w-mod(t*100\,w+tw):y=h-50" \
-          -c:v libx264 -preset superfast -tune zerolatency -b:v 3500k -maxrate 3500k -bufsize 7000k \
+          "[0:v]crop=1550:900:185:90[campo]; \
+           [campo][2:v]overlay=50:50[v]; \
+           [v]drawtext=text='LIVE CALCIO 360':fontcolor=white:fontsize=40:x=w-tw-50:y=h-th-50" \
+          -c:v libx264 -preset ultrafast -tune zerolatency -b:v 4500k -maxrate 4500k -bufsize 9000k \
           -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k \
           -f flv "rtmp://a.rtmp.youtube.com/live2/${{ secrets.STREAM_KEY }}"
