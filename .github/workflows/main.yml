@@ -1,10 +1,28 @@
-- name: Start Stream
+name: Live Stream Calcio 360 Completa
+
+on:
+  workflow_dispatch: # Avvio manuale da tab Actions
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Installazione dipendenze (FFmpeg e Browser)
         run: |
-          # Avviamo lo schermo virtuale
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb chromium-browser fonts-liberation
+
+      - name: Avvio Live Stream
+        run: |
+          # 1. Creiamo lo schermo virtuale 1080p
           Xvfb :99 -screen 0 1920x1080x24 &
           export DISPLAY=:99
           
-          # Lanciamo Chromium con i flag per nascondere traduzione e info bar
+          # 2. Apriamo il widget del campo (senza barre di disturbo)
+          # NOTA: Cambia l'ID finale (4339672) nell'URL qui sotto per cambiare partita
           chromium-browser --no-sandbox \
             --disable-setuid-sandbox \
             --start-fullscreen \
@@ -15,14 +33,19 @@
             --disable-infobars \
             "https://widgets.thesports01.com/en/3d/football?profile=74rekh26eseunr0&id=4339672" &
           
-          sleep 15 # Aspettiamo un po' di più per il caricamento completo
+          sleep 20 # Tempo per caricare il widget ed eliminare i popup iniziali
           
-          # FFmpeg con CROP per eliminare il bianco e centrare il widget
-          # Il filtro "crop=larghezza:altezza:x:y" serve a tagliare i bordi inutili
+          # 3. Lancio FFmpeg con tutti i filtri (Logo + Campo Croppato + Testo Scorrimento)
+          # Modifica 'TESTO FORMAZIONI' qui sotto con i nomi dei giocatori
           ffmpeg -f x11grab -video_size 1920x1080 -i :99.0 \
           -i "football-stadium-ambience-soccer-crowd-sound-effect-043966459_nw_prev.m4a" -stream_loop -1 \
           -i "Progetto senza titolo (1).png" \
-          -filter_complex "[0:v]crop=1200:800:360:140,scale=1920:1080[campo]; [campo][2:v]overlay=10:720" \
-          -c:v libx264 -preset veryfast -b:v 3000k -maxrate 3000k -bufsize 6000k \
+          -filter_complex \
+          "[0:v]crop=1250:850:335:120,scale=1920:1080[campo]; \
+           [campo][2:v]overlay=30:30[video_logo]; \
+           [video_logo]drawtext=text='FORMAZIONI: Bologna (4-3-3) vs Atalanta (3-4-2-1) - In diretta da Calcio360':\
+           fontcolor=white:fontsize=35:box=1:boxcolor=black@0.6:boxborderw=10:\
+           x=w-mod(t*100\,w+tw):y=h-80" \
+          -c:v libx264 -preset veryfast -b:v 3500k -maxrate 3500k -bufsize 7000k \
           -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k \
           -f flv "rtmp://a.rtmp.youtube.com/live2/${{ secrets.STREAM_KEY }}"
